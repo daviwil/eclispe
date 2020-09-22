@@ -34,6 +34,8 @@ typedef struct {
 
 typedef struct {
   short type;
+  Value *car;
+  Value *cdr;
 } ConsValue;
 
 enum ValueTypes {
@@ -46,6 +48,10 @@ enum ValueTypes {
   ConsValueType
 };
 
+NumberValue* make_number(int number_value);
 SymbolValue* make_symbol(char *symbol_name);
+ConsValue* make_cons();
+
+void print_value(Value *value);
 
 #endif
