@@ -9,11 +9,19 @@
 #define is_whitespace(c) (c == ' ' || c == '\n' || c == '\t')
 #define is_boundary(c) (is_whitespace(c) || c == ')')
 
-// This is a temporary structure for tracking lists being parsed
+// Arbitrarily picking the maximum depth of list forms, this will probably need
+// to be increased.
+#define MAX_DEPTH 1000
+
 typedef struct {
   ConsValue* head;
   ConsValue* tail;
-} ParsedList;
+} ConsList;
+
+typedef struct {
+  unsigned int depth;
+  ConsList stack[MAX_DEPTH];
+} ConsStack;
 
 void push_char(char *buffer, int* buffer_len, char c) {
   (*buffer_len)++;
@@ -26,42 +34,51 @@ void reset_buffer(char *buffer, int* buffer_len) {
   buffer[0] = 0;
 }
 
-void push_cons(ParsedList* cons_stack, unsigned int* cons_depth, ConsValue** current_cons) {
+void push_cons(ConsStack* cons_stack) {
   ConsValue* cons = make_cons();
-  cons_stack[*cons_depth].head = cons;
-  cons_stack[*cons_depth].tail = cons;
-
-  *current_cons = cons;
-  (*cons_depth)++;
+  cons_stack->depth++;
+  cons_stack->stack[cons_stack->depth - 1].head = cons;
+  cons_stack->stack[cons_stack->depth - 1].tail = cons;
 
   /* printf("Pushed cons!\n"); */
 }
 
-ConsValue *pop_cons(ParsedList* cons_stack, unsigned int* cons_depth, ConsValue** current_cons) {
-  // TODO: Assert depth > 0
-  (*cons_depth)--;
-  *current_cons = cons_stack[*cons_depth].tail;
-
+ConsValue* pop_cons(ConsStack* cons_stack) {
   /* printf("Popped cons!\n"); */
 
-  return cons_stack[*cons_depth].head;
+  // TODO: Assert depth > 0
+  return cons_stack->stack[--cons_stack->depth].head;
 }
 
-ConsValue* push_list(ConsValue* cons, Value *value) {
+// Pushes a list item onto the current cons stack level
+ConsValue* push_list_item(ConsStack* cons_stack, Value *value) {
   /* printf("Pushing value: "); */
   /* print_value(value); */
   /* puts(""); */
 
+  // Create the new cons with the specified value
   ConsValue* next_cons = make_cons();
   next_cons->car = value;
-  cons->cdr = (Value*)next_cons;
+
+  // Update the existing tail with new cons as cdr, set new tail
+  cons_stack->stack[cons_stack->depth - 1].tail->cdr = (Value*)next_cons;
+  cons_stack->stack[cons_stack->depth - 1].tail = next_cons;
+
   return next_cons;
 }
 
-ConsValue* clone_cons(ConsValue* original_cons) {
-  ConsValue* new_cons = malloc(sizeof(ConsValue));
-  memcpy(new_cons, original_cons, sizeof(ConsValue));
-  return new_cons;
+void set_current_cons_value(ConsStack* cons_stack, Value* value, unsigned char *is_pair) {
+  // TODO: Assert depth > 0
+  ConsValue* current_cons = cons_stack->stack[cons_stack->depth - 1].tail;
+
+  if (current_cons->car == NULL) {
+    current_cons->car = value;
+  } else if (*is_pair == 1) {
+    current_cons->cdr = value;
+    is_pair = 0;
+  } else {
+    push_list_item(cons_stack, value);
+  }
 }
 
 Value* finish_value(ValueType value_type, char* value_buffer, int* buffer_len) {
@@ -85,18 +102,13 @@ Value* finish_value(ValueType value_type, char* value_buffer, int* buffer_len) {
   return value;
 }
 
-// Arbitrarily picking the maximum depth of list forms, this will probably need
-// to be increased.
-const unsigned short MAX_DEPTH = 100;
-
 Value* parse_form(char *form_string) {
   ValueType current_type = 0;
   Value* current_value = NULL;
 
-  unsigned int depth = 0;
   unsigned char is_pair = 0;
-  ParsedList cons_stack[MAX_DEPTH];
-  ConsValue *current_cons = NULL;
+  ConsStack cons_stack;
+  cons_stack.depth = 0;
 
   char buffer[100];
   int buffer_len = -1;
@@ -113,28 +125,25 @@ Value* parse_form(char *form_string) {
       if (c == '(') {
         // Prepare the cons for this depth
         current_type = ConsValueType;
-        push_cons(cons_stack, &depth, &current_cons);
+        push_cons(&cons_stack);
       } else if (c == ')') {
         // Pop the cons element
-        if (depth > 0) {
+        if (cons_stack.depth > 0) {
           /* puts("Finishing cons!"); */
-          ConsValue* popped_cons = pop_cons(cons_stack, &depth, &current_cons);
-          if (depth > 0) {
+          ConsValue* popped_cons = pop_cons(&cons_stack);
+          if (cons_stack.depth > 0) {
             // Push the popped cons as a list item
             current_type = ConsValueType;
-            current_cons = push_list(current_cons, (Value*)popped_cons);
+            push_list_item(&cons_stack, (Value*)popped_cons);
           } else {
             // Finish the cons and return it as a value
             current_type = 0;
-            current_cons = NULL;
             current_value = (Value*)popped_cons;
           }
         } else {
           // TODO: Parse error
           printf("ERROR: Unmatched close parentheses\n");
         }
-
-        depth--;
       } else if (c == '.' && current_type == ConsValueType) {
         if (is_pair == 0) {
           /* puts("Is pair!"); */
@@ -162,21 +171,9 @@ Value* parse_form(char *form_string) {
       } else if (is_boundary(c)) {
         current_value = finish_value(current_type, buffer, &buffer_len);
 
-        if (depth > 0) {
+        if (cons_stack.depth > 0) {
+          set_current_cons_value(&cons_stack, current_value, &is_pair);
           current_type = ConsValueType;
-          if (current_cons->car == NULL) {
-            current_cons->car = current_value;
-          } else if (current_cons->cdr != NULL) {
-            printf("ERROR: cdr already set!");
-            break;
-          } else if (is_pair == 1) {
-            current_cons->cdr = current_value;
-            is_pair = 0;
-          } else {
-            // Add to the list
-            /* puts("Pushing number!"); */
-            current_cons = push_list(current_cons, current_value);
-          }
 
           if (c == ')') {
             // Let the outer case handle it
@@ -193,22 +190,9 @@ Value* parse_form(char *form_string) {
       } else if (is_boundary(c)) {
         current_value = finish_value(current_type, buffer, &buffer_len);
 
-        if (depth > 0) {
+        if (cons_stack.depth > 0) {
+          set_current_cons_value(&cons_stack, current_value, &is_pair);
           current_type = ConsValueType;
-          if (current_cons->car == NULL) {
-            /* puts("Setting car!"); */
-            current_cons->car = current_value;
-          } else if (current_cons->cdr != NULL) {
-            printf("ERROR: cdr already set!");
-            break;
-          } else if (is_pair == 1) {
-            current_cons->cdr = current_value;
-            is_pair = 0;
-          } else {
-            // Add to the list
-            /* puts("Pushing symbol!"); */
-            current_cons = push_list(current_cons, current_value);
-          }
 
           if (c == ')') {
             // Let the outer case handle it
@@ -223,12 +207,15 @@ Value* parse_form(char *form_string) {
 
     /* printf("End of string, type: %d, cons: %d\n", current_type, current_cons); */
 
-    if (depth == 0 && current_cons != NULL) {
-      // TODO: Error on incomplete forms
-      // TODO: Is this case even possible?  depth would be 1 at least
-    } else {
-      current_value = finish_value(current_type, buffer, &buffer_len);
-    }
+    // TODO: How to check for incomplete forms in new model?
+    /* if (cons_stack.depth == 0) { */
+    /*   // TODO: Error on incomplete forms */
+    /*   // TODO: Is this case even possible?  depth would be 1 at least */
+    /* } else { */
+    /*   current_value = finish_value(current_type, buffer, &buffer_len); */
+    /* } */
+
+    current_value = finish_value(current_type, buffer, &buffer_len);
   }
 
   /* printf("Returning value of type: %d\n", current_value->type); */
