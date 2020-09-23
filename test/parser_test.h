@@ -1,13 +1,13 @@
 #include "./greatest.h"
 #include "../src/parser.h"
 
-#define check_number(value, expected_value)    \
-  ASSERT_EQ(NumberValueType, value->type);     \
-  ASSERT(((NumberValue*)value)->number_value); \
+#define check_number(value, expected_value)                        \
+  ASSERT_EQ(NumberValueType, value->type);                         \
+  ASSERT_EQ(expected_value, ((NumberValue*)value)->number_value);  \
 
-#define check_symbol(value, expected_value)   \
-  ASSERT_EQ(SymbolValueType, value->type);    \
-  ASSERT(((SymbolValue*)value)->symbol_name); \
+#define check_symbol(value, expected_value)                          \
+  ASSERT_EQ(SymbolValueType, value->type);                           \
+  ASSERT_STR_EQ(expected_value, ((SymbolValue*)value)->symbol_name); \
 
 #define check_car(cons_var, expected_type, car_var)            \
   ASSERT_EQ(ConsValueType, cons_var->type);                    \
@@ -49,12 +49,10 @@ TEST parser_parses_pairs(void) {
 
   ConsValue* cons = (ConsValue *)result;
   ASSERT(cons->car);
-  ASSERT_EQ(SymbolValueType, cons->car->type);
-  ASSERT_STR_EQ("test", ((SymbolValue*)cons->car)->symbol_name);
+  check_symbol(cons->car, "test");
 
   ASSERT(cons->cdr);
-  ASSERT_EQ(NumberValueType, cons->cdr->type);
-  ASSERT_EQ(1, ((NumberValue*)cons->cdr)->number_value);
+  check_number(cons->cdr, 1);
 
   PASS();
 }
