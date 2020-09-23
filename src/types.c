@@ -57,7 +57,9 @@ void print_value(Value *value) {
           printf(" ");
         }
 
-        print_value(cons->cdr);
+        if (cons->cdr != NULL) {
+          print_value(cons->cdr);
+        }
       }
 
       cons = NULL;

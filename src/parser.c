@@ -8,6 +8,7 @@
 
 #define is_whitespace(c) (c == ' ' || c == '\n' || c == '\t')
 #define is_boundary(c) (is_whitespace(c) || c == ')')
+#define is_symbol_char(c) (isalpha(c) || c == '+' || c == '-' || c == '/' || c == '*')
 
 // Arbitrarily picking the maximum depth of list forms, this will probably need
 // to be increased.
@@ -44,7 +45,7 @@ void push_cons(ConsStack* cons_stack) {
 }
 
 ConsValue* pop_cons(ConsStack* cons_stack) {
-  /* printf("Popped cons!\n"); */
+  /* printf("Popped cons at %d!\n", cons_stack->depth); */
 
   // TODO: Assert depth > 0
   return cons_stack->stack[--cons_stack->depth].head;
@@ -75,7 +76,7 @@ void set_current_cons_value(ConsStack* cons_stack, Value* value, unsigned char *
     current_cons->car = value;
   } else if (*is_pair == 1) {
     current_cons->cdr = value;
-    is_pair = 0;
+    *is_pair = 0;
   } else {
     push_list_item(cons_stack, value);
   }
@@ -129,12 +130,11 @@ Value* parse_form(char *form_string) {
       } else if (c == ')') {
         // Pop the cons element
         if (cons_stack.depth > 0) {
-          /* puts("Finishing cons!"); */
           ConsValue* popped_cons = pop_cons(&cons_stack);
           if (cons_stack.depth > 0) {
             // Push the popped cons as a list item
             current_type = ConsValueType;
-            push_list_item(&cons_stack, (Value*)popped_cons);
+            set_current_cons_value(&cons_stack, (Value*)popped_cons, &is_pair);
           } else {
             // Finish the cons and return it as a value
             current_type = 0;
@@ -146,7 +146,6 @@ Value* parse_form(char *form_string) {
         }
       } else if (c == '.' && current_type == ConsValueType) {
         if (is_pair == 0) {
-          /* puts("Is pair!"); */
           is_pair = 1;
         } else {
           // TODO: Error
@@ -156,11 +155,10 @@ Value* parse_form(char *form_string) {
       } else if (isdigit(c)) {
         current_type = NumberValueType;
         push_char(buffer, &buffer_len, c);
-      } else if (isalpha(c)) {
+      } else if (is_symbol_char(c)) {
         current_type = SymbolValueType;
         push_char(buffer, &buffer_len, c);
       } else if (is_whitespace(c)) {
-        /* puts("Whitespace"); */
         // Ignore whitespace at this level
       } else {
         printf("Unexpected character: %c\n", c);
@@ -185,7 +183,7 @@ Value* parse_form(char *form_string) {
         }
       }
     } else if (current_type == SymbolValueType) {
-      if (isalpha(c)) {
+      if (is_symbol_char(c)) {
         push_char(buffer, &buffer_len, c);
       } else if (is_boundary(c)) {
         current_value = finish_value(current_type, buffer, &buffer_len);
@@ -197,6 +195,9 @@ Value* parse_form(char *form_string) {
           if (c == ')') {
             // Let the outer case handle it
             i--;
+          } else {
+            // TODO: Maybe don't stop yet so we can error if there's another form
+            break;
           }
         }
       }
@@ -219,6 +220,8 @@ Value* parse_form(char *form_string) {
   }
 
   /* printf("Returning value of type: %d\n", current_value->type); */
+  /* print_value(current_value); */
+  /* puts(""); */
 
   return current_value;
 }
