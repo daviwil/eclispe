@@ -26,6 +26,19 @@ SymbolValue* make_symbol(char *symbol_name) {
   return symbol;
 }
 
+StringValue* make_string(char *string_value) {
+  StringValue* string = malloc(sizeof(StringValue));
+
+  unsigned long str_size = strlen(string_value) + 1;
+  char* string_value_copy = malloc(str_size);
+  memcpy(string_value_copy, string_value, str_size);
+
+  string->type = StringValueType;
+  string->string_value= string_value_copy;
+
+  return string;
+}
+
 ConsValue* make_cons() {
   ConsValue* cons = malloc(sizeof(ConsValue));
   cons->type = ConsValueType;
@@ -40,10 +53,13 @@ void print_value(Value *value) {
   // TODO: Assert not null?
   switch (value->type) {
   case NumberValueType:
-    printf("%d", ((NumberValue *) value)->number_value);
+    printf("%d", ((NumberValue*)value)->number_value);
     break;
   case SymbolValueType:
-    printf("%s", ((SymbolValue *) value)->symbol_name);
+    printf("%s", ((SymbolValue*)value)->symbol_name);
+    break;
+  case StringValueType:
+    printf("\"%s\"", ((StringValue*)value)->string_value);
     break;
   case ConsValueType:
     printf("(");

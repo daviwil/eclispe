@@ -5,6 +5,10 @@
   ASSERT_EQ(NumberValueType, value->type);                         \
   ASSERT_EQ(expected_value, ((NumberValue*)value)->number_value);  \
 
+#define check_string(value, expected_value)                            \
+  ASSERT_EQ(StringValueType, value->type);                             \
+  ASSERT_STR_EQ(expected_value, ((StringValue*)value)->string_value);  \
+
 #define check_symbol(value, expected_value)                          \
   ASSERT_EQ(SymbolValueType, value->type);                           \
   ASSERT_STR_EQ(expected_value, ((SymbolValue*)value)->symbol_name); \
@@ -39,6 +43,16 @@ TEST parser_parses_numbers(void) {
 TEST parser_parses_symbols(void) {
   Value* result = parse_form("symbol");
   check_symbol(result, "symbol");
+
+  PASS();
+}
+
+TEST parser_parses_strings(void) {
+  Value* result = parse_form("\"hello world!\"");
+  check_string(result, "hello world!");
+
+  Value* result2 = parse_form("\"hello \\\"world!\\\"\"");
+  check_string(result2, "hello \"world!\"");
 
   PASS();
 }
@@ -131,6 +145,7 @@ TEST parser_ends_at_boundaries(void) {
 
 SUITE(parser_suite) {
     RUN_TEST(parser_parses_numbers);
+    RUN_TEST(parser_parses_strings);
     RUN_TEST(parser_parses_symbols);
     RUN_TEST(parser_parses_pairs);
     RUN_TEST(parser_parses_lists);

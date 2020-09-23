@@ -89,6 +89,9 @@ Value* finish_value(ValueType value_type, char* value_buffer, int* buffer_len) {
     case NumberValueType:
       value = (Value*) make_number(atoi(value_buffer));
       break;
+    case StringValueType:
+      value = (Value*) make_string(value_buffer);
+      break;
     case SymbolValueType:
       value = (Value*) make_symbol(value_buffer);
       break;
@@ -110,6 +113,9 @@ Value* parse_form(char *form_string) {
   unsigned char is_pair = 0;
   ConsStack cons_stack;
   cons_stack.depth = 0;
+
+  // Used for string parsing
+  unsigned char is_char_escaped = 0;
 
   char buffer[100];
   int buffer_len = -1;
@@ -152,6 +158,10 @@ Value* parse_form(char *form_string) {
           printf("Can't have more than one '.' in a pair!\n");
           break;
         }
+      } else if (c == '"') {
+        // TODO: One day I'll have to deal with Unicode
+        // https://www.cprogramming.com/tutorial/unicode.html
+        current_type = StringValueType;
       } else if (isdigit(c)) {
         current_type = NumberValueType;
         push_char(buffer, &buffer_len, c);
@@ -162,6 +172,25 @@ Value* parse_form(char *form_string) {
         // Ignore whitespace at this level
       } else {
         printf("Unexpected character: %c\n", c);
+      }
+    } else if (current_type == StringValueType) {
+      if (c == '"' && is_char_escaped == 0) {
+        current_value = finish_value(current_type, buffer, &buffer_len);
+
+        if (cons_stack.depth > 0) {
+          set_current_cons_value(&cons_stack, current_value, &is_pair);
+          current_type = ConsValueType;
+
+          if (c == ')') {
+            // Let the outer case handle it
+            i--;
+          }
+        }
+      } else if (c == '\\') {
+        is_char_escaped = 1;
+      } else {
+        is_char_escaped = 0;
+        push_char(buffer, &buffer_len, c);
       }
     } else if (current_type == NumberValueType) {
       if (isdigit(c)) {
@@ -195,9 +224,6 @@ Value* parse_form(char *form_string) {
           if (c == ')') {
             // Let the outer case handle it
             i--;
-          } else {
-            // TODO: Maybe don't stop yet so we can error if there's another form
-            break;
           }
         }
       }

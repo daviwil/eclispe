@@ -49,7 +49,8 @@ enum ValueTypes {
 };
 
 NumberValue* make_number(int number_value);
-SymbolValue* make_symbol(char *symbol_name);
+SymbolValue* make_symbol(char* symbol_name);
+StringValue* make_string(char* string_value);
 ConsValue* make_cons();
 
 void print_value(Value *value);
