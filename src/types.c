@@ -52,7 +52,6 @@ void print_value(Value *value) {
       if (cons->cdr) {
         if (cons->cdr->type != ConsValueType) {
           printf(" . ");
-          cons = (ConsValue*)cons->cdr;
         } else {
           printf(" ");
         }
