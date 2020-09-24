@@ -45,13 +45,16 @@ enum ValueTypes {
   FloatValueType,
   StringValueType,
   SymbolValueType,
-  ConsValueType
+  ConsValueType,
+  FunctionValueType,
 };
 
 NumberValue* make_number(int number_value);
 SymbolValue* make_symbol(char* symbol_name);
 StringValue* make_string(char* string_value);
 ConsValue* make_cons();
+ConsValue* make_cons_with(Value* car, Value* cdr);
+ConsValue* make_list(unsigned int size, ...);
 
 void print_value(Value *value);
 

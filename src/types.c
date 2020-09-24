@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include "./types.h"
 
@@ -45,6 +46,42 @@ ConsValue* make_cons() {
   // TODO: Set nil in car and cdr
 
   return cons;
+}
+
+ConsValue* make_cons_with(Value* car, Value* cdr) {
+  ConsValue *cons = make_cons();
+  cons->car = car;
+  cons->cdr = cdr;
+
+  return cons;
+}
+
+ConsValue* make_list(unsigned int size, ...) {
+  va_list argp;
+  va_start(argp, size);
+
+  ConsValue* cons = NULL;
+  ConsValue* head = NULL;
+  for (int i = 0; i < size; i++) {
+    Value* item = va_arg(argp, Value*);
+    if (item != NULL) {
+      ConsValue* last_cons = cons;
+      cons = make_cons();
+      cons->car = item;
+
+      if (last_cons != NULL) {
+        last_cons->cdr = (Value*)cons;
+      }
+
+      if (head == NULL) {
+        head = cons;
+      }
+    }
+  }
+
+  va_end(argp);
+
+  return head;
 }
 
 void print_value(Value *value) {
