@@ -1,61 +1,80 @@
 #include <stdio.h>
 #include <string.h>
+
 #include "./types.h"
+#include "./list.h"
 #include "./eval.h"
 
 #define is_pair(value) (value->type == ConsValueType)
 #define is_atom(value) !is_pair(value)
 
-Value* cons_car(Value* cons) {
+Value* cons_car(ConsValue* cons) {
   if (cons->type == ConsValueType) {
-    return ((ConsValue *)cons)->car;
+    return cons->car;
   }
 
   return NULL;
 }
 
-Value* cons_cdr(Value* cons) {
+Value* cons_set_car(ConsValue* cons, Value* new_value) {
   if (cons->type == ConsValueType) {
-    return ((ConsValue *)cons)->cdr;
-  }
-
-  return NULL;
-}
-
-Value* cons_set_cdr(Value* cons, Value* new_value) {
-  if (cons->type == ConsValueType) {
-    ((ConsValue*)cons)->cdr = new_value;
+    cons->car = new_value;
     return new_value;
   }
 
   return NULL;
 }
 
-Value* cons_nth(Value *cons, int n) {
+Value* cons_cdr(ConsValue* cons) {
+  if (cons->type == ConsValueType) {
+    return cons->cdr;
+  }
+
+  return NULL;
+}
+
+Value* cons_set_cdr(ConsValue* cons, Value* new_value) {
+  if (cons->type == ConsValueType) {
+    cons->cdr = new_value;
+    return new_value;
+  }
+
+  return NULL;
+}
+
+Value* cons_nth(ConsValue *cons, int n) {
   for (int i = 0; i < n; i++) {
-    cons = cons_cdr(cons);
+    if (cons->type != ConsValueType) {
+      // TODO: Error?
+      return NULL;
+    }
+
+    cons = (ConsValue*)cons_cdr(cons);
     if (cons == NULL) {
       return NULL;
     }
   }
 
-  return cons;
+  return (Value*) cons;
 }
 
-Value* cons_cadr(Value* cons) {
-  return cons_car(cons_nth(cons, 1));
+Value* cons_cadr(ConsValue* cons) {
+  // TODO: Ensure result
+  return cons_car((ConsValue*)cons_nth(cons, 1));
 }
 
-Value* cons_cddr(Value* cons) {
+Value* cons_cddr(ConsValue* cons) {
   return cons_nth(cons, 2);
 }
 
-Value* cons_caddr(Value* cons) {
-  return cons_car(cons_nth(cons, 2));
+Value* cons_caddr(ConsValue* cons) {
+  // TODO: Ensure result
+  return cons_car((ConsValue*)cons_nth(cons, 2));
 }
 
-Value* cons_cadddr(Value* cons) {
-  return cons_car(cons_nth(cons, 3));
+Value* cons_cadddr(ConsValue* cons) {
+  // TODO: Ensure result
+  return cons_car((ConsValue*)cons_nth(cons, 3));
 }
 
 int is_symbol_named(Value* symbol, char* expected_name) {
@@ -90,31 +109,131 @@ int equal(Value* left, Value* right) {
   return 0;
 }
 
-Value* eprogn(Value* cons, Value* env) {
+Value* eprogn(ConsValue* cons, ConsValue* env) {
+  puts("eprogn");
+  print_value((Value*)cons);
+  puts("");
+  if (env) {
+    print_value((Value*)env);
+    puts("");
+  }
+
   // This may need to change to be more like the LISP implementation
   Value* result = NULL;
   while (cons) {
+    puts("eval");
+    print_value((Value*)cons);
+    puts("");
     result = eval(cons_car(cons), env);
-    cons = cons_cdr(cons);
+    puts("result");
+    print_value(result);
+    puts("");
+    cons = (ConsValue*)cons_cdr(cons);
+    // TODO: Make sure it's really a cons
   }
+
+  puts("eprogn result");
+  print_value(result);
+  puts("\n");
 
   return result;
 }
 
-Value* evlis(Value* exprs, Value* env) {
-  return NULL;
+Value* invoke(FunctionValue* func, ConsValue *args) {
+  puts("Invoke:");
+  print_value((Value*)func);
+  print_value((Value*)args);
+  puts("");
+
+  // For each arg, match it with params
+  ConsValue* params = func->args;
+
+  puts("Expected parameters:");
+  print_value((Value*)params);
+  puts("\n");
+
+  // TODO: Use push_list_item
+  ConsValue* env_head = NULL;
+  ConsValue* env = NULL;
+  while (params != NULL) {
+    ConsValue* pair = make_cons_with(params->car, args->car);
+    ConsValue *new_arg = make_cons_with((Value*)pair, NULL);
+    if (env_head == NULL) {
+      env = env_head = new_arg;
+    } else {
+      env->cdr = (Value*)new_arg;
+      env = new_arg;
+    }
+
+    params = (ConsValue*)params->cdr;
+    args = (ConsValue*)args->cdr;
+  }
+
+  // Attach the definition environment
+  env->cdr = (Value*)func->env;
+
+  puts("Out of the loop");
+  print_value((Value*)env_head);
+
+  puts("\n");
+
+  if (func->invoker != NULL) {
+    puts("Invoking primitive!");
+    return func->invoker(env_head);
+  } else {
+    return eprogn(func->body, env_head);
+  }
 }
 
-Value* lookup(SymbolValue *symbol, Value* env) {
+ConsValue* evlis(ConsValue* exprs, ConsValue* env) {
+  ConsValue* cons = NULL;
+  ConsValue* head = NULL;
+
+  puts("\nEvaluating arguments");
+
+  // Evaluate each item and return a new list
+  while (exprs != NULL) {
+    if (exprs->type != ConsValueType) {
+      return NULL;
+    }
+
+    ConsValue* last_cons = cons;
+    cons = make_cons();
+    if (head == NULL) {
+      head = cons;
+    }
+
+    /* puts("Value:"); */
+    /* print_value(exprs->car); */
+    /* puts(""); */
+    /* print_value(eval(exprs->car, env)); */
+    /* puts(""); */
+
+    cons_set_car(cons, eval(exprs->car, env));
+    if (last_cons != NULL) {
+      last_cons->cdr = (Value*)cons;
+    }
+
+    exprs = (ConsValue*)cons_cdr(exprs);
+  }
+
+  /* puts("Result:"); */
+  /* print_value((Value*)head); */
+  /* puts(""); */
+
+  return (ConsValue*) head;
+}
+
+Value* lookup(SymbolValue *symbol, ConsValue* env) {
   ConsValue* cons = (ConsValue*) env;
   while (cons != NULL) {
     if (cons->type != ConsValueType) {
       return NULL;
     }
 
-    Value* pair_symbol = cons_car(cons->car);
+    Value* pair_symbol = cons_car((ConsValue*)cons->car);
     if (equal(pair_symbol, (Value*)symbol)) {
-      return cons_cdr(cons->car);
+      return cons_cdr((ConsValue*)cons->car);
     }
 
     cons = (ConsValue*)cons->cdr;
@@ -123,17 +242,24 @@ Value* lookup(SymbolValue *symbol, Value* env) {
   return NULL;
 }
 
-Value* update(Value* symbol, Value* new_value, Value* env) {
-  ConsValue* cons = (ConsValue*) env;
+Value *lookup_by_name(char *name, ConsValue *env) {
+  SymbolValue symbol;
+  symbol.type = SymbolValueType;
+  symbol.symbol_name = name;
+  return lookup(&symbol, env);
+}
+
+Value* update(Value* symbol, Value* new_value, ConsValue* env) {
+  ConsValue* cons = env;
   while (cons != NULL) {
     if (cons->type != ConsValueType) {
       return NULL;
     }
 
-    Value* pair_symbol = cons_car(cons->car);
+    Value* pair_symbol = cons_car((ConsValue*)cons->car);
     if (equal(pair_symbol, (Value*)symbol)) {
       // TODO: Create a new cons cell for the new value?
-      return cons_set_cdr(cons->car, new_value);
+      return cons_set_cdr((ConsValue*)cons->car, new_value);
     }
 
     cons = (ConsValue*)cons->cdr;
@@ -142,21 +268,60 @@ Value* update(Value* symbol, Value* new_value, Value* env) {
   return NULL;
 }
 
-Value* make_function(Value* args, Value* body, Value* env) {
+Value* prim_add(ConsValue* env) {
+  Value* x = lookup_by_name("x", env);
+  Value* y = lookup_by_name("y", env);
+
+  if (x && x->type == NumberValueType) {
+    if (y) {
+      if (y->type == NumberValueType) {
+        return (Value*)make_number(((NumberValue*)x)->number_value + ((NumberValue*)y)->number_value);
+      } else {
+        puts("Argument 'y' is not a number!");
+      }
+    } else {
+      return x;
+    }
+  } else {
+    puts("Argument 'x' is not a number!");
+  }
+
   return NULL;
 }
 
-Value* eval(Value* expr, Value* env) {
-  if (is_atom(expr)) {
-    switch(expr->type) {
+Value* bind_prim(char* name, PrimFunc invoker, ConsValue* args) {
+  return (Value*)make_cons_with((Value*)make_symbol(name), (Value*)make_prim_function(invoker, args, NULL));
+}
+
+ConsValue* init_global_env() {
+  ConsList env_list;
+  env_list.head = NULL;
+  env_list.tail = NULL;
+
+  puts("Initializing env");
+
+  // Add primitive functions
+  push_list_item(&env_list, bind_prim("+", &prim_add, make_list(2, make_symbol("x"), make_symbol("y"))));
+
+  puts("Initial env:");
+  print_value((Value*)env_list.head);
+  puts("\n");
+
+  return env_list.head;
+}
+
+Value* eval(Value* value, ConsValue* env) {
+  if (is_atom(value)) {
+    switch(value->type) {
     case NumberValueType:
     case StringValueType:
-      return expr;
+      return value;
     case SymbolValueType:
-      return lookup((SymbolValue*)expr, env);
+      return lookup((SymbolValue*)value, env);
     }
   } else {
-    Value* operator = cons_car(expr);
+    ConsValue* expr = (ConsValue*)value;
+    Value* operator = cons_car((ConsValue*)expr);
     if (operator->type == SymbolValueType) {
       // Check for special forms
       if (is_symbol_named(operator, "if")) {
@@ -174,12 +339,51 @@ Value* eval(Value* expr, Value* env) {
       } else if (is_symbol_named(operator, "quote")) {
         return cons_cadr(expr);
       } else if (is_symbol_named(operator, "begin")) {
-        // TODO: Use environment
-        return eprogn(cons_cdr(expr), NULL);
+        // TODO: Verify cons
+        return eprogn((ConsValue*)cons_cdr(expr), env);
       } else if (is_symbol_named(operator, "lambda")) {
-        return make_function(cons_cadr(expr), cons_cddr(expr), env);
+        Value* args = cons_cadr(expr);
+        Value* body = cons_cddr(expr);
+        if (args->type != ConsValueType) {
+          puts("Lambda must have a list in argument position");
+          return NULL;
+        }
+        if (body == NULL) {
+          puts("Lambda must have a body");
+          return NULL;
+        }
+        return (Value*)make_function((ConsValue*)body, (ConsValue*)args, (ConsValue*)env);
+      } else {
+        FunctionValue* func = (FunctionValue*)eval(operator, env);
+        puts("Function operator:");
+        print_value(operator);
+        puts("");
+        /* printf("FUNC IS %d\n", (int)func); */
+        if (func) {
+          if (func->type == FunctionValueType) {
+            return invoke(func, evlis((ConsValue*)cons_cdr(expr), env));
+          } else {
+            puts("Cannot eval non-function in operator position!");
+            return NULL;
+          }
+        } else {
+          printf("Could not resolve operator: ");
+          print_value(operator);
+          puts("");
+        }
       }
     } else {
+      puts("\nOperator:");
+      print_value(operator);
+      puts("\n");
+      FunctionValue* func = (FunctionValue*)eval(operator, env);
+      if (func->type == FunctionValueType) {
+        return invoke(func, evlis((ConsValue*)cons_cdr(expr), env));
+      } else {
+        puts("Cannot eval non-function in operator position!");
+        return NULL;
+      }
+
       printf("Operator is not a symbol!\n");
     }
   }

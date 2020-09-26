@@ -4,6 +4,7 @@
 #include <ctype.h>
 
 #include "./types.h"
+#include "./list.h"
 #include "./parser.h"
 
 #define is_whitespace(c) (c == ' ' || c == '\n' || c == '\t')
@@ -13,11 +14,6 @@
 // Arbitrarily picking the maximum depth of list forms, this will probably need
 // to be increased.
 #define MAX_DEPTH 1000
-
-typedef struct {
-  ConsValue* head;
-  ConsValue* tail;
-} ConsList;
 
 typedef struct {
   unsigned int depth;
@@ -52,20 +48,8 @@ ConsValue* pop_cons(ConsStack* cons_stack) {
 }
 
 // Pushes a list item onto the current cons stack level
-ConsValue* push_list_item(ConsStack* cons_stack, Value *value) {
-  /* printf("Pushing value: "); */
-  /* print_value(value); */
-  /* puts(""); */
-
-  // Create the new cons with the specified value
-  ConsValue* next_cons = make_cons();
-  next_cons->car = value;
-
-  // Update the existing tail with new cons as cdr, set new tail
-  cons_stack->stack[cons_stack->depth - 1].tail->cdr = (Value*)next_cons;
-  cons_stack->stack[cons_stack->depth - 1].tail = next_cons;
-
-  return next_cons;
+ConsValue* push_stack_list_item(ConsStack* cons_stack, Value *value) {
+  return push_list_item(&cons_stack->stack[cons_stack->depth - 1], value);
 }
 
 void set_current_cons_value(ConsStack* cons_stack, Value* value, unsigned char *is_pair) {
@@ -78,7 +62,7 @@ void set_current_cons_value(ConsStack* cons_stack, Value* value, unsigned char *
     current_cons->cdr = value;
     *is_pair = 0;
   } else {
-    push_list_item(cons_stack, value);
+    push_stack_list_item(cons_stack, value);
   }
 }
 

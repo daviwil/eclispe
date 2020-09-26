@@ -1,4 +1,5 @@
 #include "./greatest.h"
+#include "../src/list.h"
 #include "../src/parser.h"
 #include "../src/eval.h"
 #include "./checks.h"
@@ -52,11 +53,11 @@ TEST evaluates_symbol(void) {
                                 make_cons_with((Value*)make_symbol("test"),  (Value*)make_number(4)));
 
   Value *result = parse_form("test");
-  Value *num = eval(result, (Value*)env);
+  Value *num = eval(result, env);
   check_number(num, 4);
 
   result = parse_form("bork");
-  Value *nope = eval(result, (Value*)env);
+  Value *nope = eval(result, env);
   ASSERT_EQ(NULL, nope);
 
   PASS();
@@ -66,16 +67,32 @@ TEST evaluates_set(void) {
   ConsValue *env = make_list(1, make_cons_with((Value*)make_symbol("test"),  (Value*)make_number(4)));
 
   Value* result = parse_form("(set! test 311)");
-  Value* num = eval(result, (Value*)env);
+  Value* num = eval(result, env);
   check_number(num, 311);
 
   result = parse_form("test");
-  Value* new_num = eval(result, (Value*)env);
+  Value* new_num = eval(result, env);
   check_number(num, 311);
 
   result = parse_form("(set! bogus \"oh no\")");
-  Value* nope = eval(result, (Value*)env);
+  Value* nope = eval(result, env);
   ASSERT_EQ(NULL, nope);
+
+  PASS();
+}
+
+TEST evaluates_lambda(void) {
+  ConsValue *env = init_global_env();
+
+  Value* result = parse_form("((lambda (x) x) 2)");
+  print_value(result);
+  puts("");
+  Value* num = eval(result, env);
+  check_number(num, 2);
+
+  result = parse_form("((lambda (x) ((lambda (y) (+ x y)) 3)) 2)");
+  num = eval(result, env);
+  check_number(num, 5);
 
   PASS();
 }
@@ -88,4 +105,5 @@ SUITE(eval_suite) {
   RUN_TEST(evaluates_begin);
   RUN_TEST(evaluates_symbol);
   RUN_TEST(evaluates_set);
+  RUN_TEST(evaluates_lambda);
 }

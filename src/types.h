@@ -33,10 +33,23 @@ typedef struct {
 } SymbolValue;
 
 typedef struct {
-  short type;
+  ValueType type;
   Value *car;
   Value *cdr;
 } ConsValue;
+
+// Defines the signature for primitive function pointers.
+// Accepts an environment as parameter, all arguments will
+// be bound within it.
+typedef Value* (*PrimFunc)(ConsValue*);
+
+typedef struct {
+  ValueType type;
+  ConsValue *args;
+  ConsValue *body;
+  ConsValue *env;
+  PrimFunc invoker;
+} FunctionValue;
 
 enum ValueTypes {
   NilValueType = 0,
@@ -54,7 +67,8 @@ SymbolValue* make_symbol(char* symbol_name);
 StringValue* make_string(char* string_value);
 ConsValue* make_cons();
 ConsValue* make_cons_with(Value* car, Value* cdr);
-ConsValue* make_list(unsigned int size, ...);
+FunctionValue* make_function(ConsValue* body, ConsValue* args, ConsValue* env);
+FunctionValue* make_prim_function(PrimFunc invoker, ConsValue* args, ConsValue* env);
 
 void print_value(Value *value);
 

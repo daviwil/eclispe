@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 
 #include "./types.h"
 
@@ -56,48 +55,41 @@ ConsValue* make_cons_with(Value* car, Value* cdr) {
   return cons;
 }
 
-ConsValue* make_list(unsigned int size, ...) {
-  va_list argp;
-  va_start(argp, size);
+FunctionValue* make_function(ConsValue* body, ConsValue* args, ConsValue* env) {
+  FunctionValue* func = malloc(sizeof(FunctionValue));
+  func->type = FunctionValueType;
+  func->args = args;
+  func->body = body;
+  func->env = env;
 
-  ConsValue* cons = NULL;
-  ConsValue* head = NULL;
-  for (int i = 0; i < size; i++) {
-    Value* item = va_arg(argp, Value*);
-    if (item != NULL) {
-      ConsValue* last_cons = cons;
-      cons = make_cons();
-      cons->car = item;
+  return func;
+}
 
-      if (last_cons != NULL) {
-        last_cons->cdr = (Value*)cons;
-      }
+FunctionValue* make_prim_function(PrimFunc invoker, ConsValue* args, ConsValue* env) {
+  FunctionValue* func = make_function(NULL, args, env);
+  func->invoker = invoker;
 
-      if (head == NULL) {
-        head = cons;
-      }
-    }
-  }
-
-  va_end(argp);
-
-  return head;
+  return func;
 }
 
 void print_value(Value *value) {
   ConsValue* cons = (ConsValue*)value;
+  FunctionValue* func = (FunctionValue*)value;
 
   // TODO: Assert not null?
   switch (value->type) {
   case NumberValueType:
     printf("%d", ((NumberValue*)value)->number_value);
     break;
+
   case SymbolValueType:
     printf("%s", ((SymbolValue*)value)->symbol_name);
     break;
+
   case StringValueType:
     printf("\"%s\"", ((StringValue*)value)->string_value);
     break;
+
   case ConsValueType:
     printf("(");
     while (cons != NULL) {
@@ -109,6 +101,8 @@ void print_value(Value *value) {
           printf(" ");
         }
 
+        fflush(stdout);
+
         if (cons->cdr != NULL) {
           print_value(cons->cdr);
         }
@@ -118,6 +112,18 @@ void print_value(Value *value) {
     }
     printf(")");
     break;
+
+  case FunctionValueType:
+    if (func->invoker) {
+      printf("(prim ");
+    } else {
+      printf("(lambda ");
+    }
+
+    /* print_value(func->args); */
+    printf(")");
+    break;
+
   default:
     printf("Unknown Value Type: %d\n", value->type);
     break;
