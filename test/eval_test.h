@@ -85,8 +85,6 @@ TEST evaluates_lambda(void) {
   ConsValue *env = init_global_env();
 
   Value* result = parse_form("((lambda (x) x) 2)");
-  print_value(result);
-  puts("");
   Value* num = eval(result, env);
   check_number(num, 2);
 

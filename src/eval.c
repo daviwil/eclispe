@@ -4,6 +4,7 @@
 #include "./types.h"
 #include "./list.h"
 #include "./eval.h"
+#include "./log.h"
 
 #define is_pair(value) (value->type == ConsValueType)
 #define is_atom(value) !is_pair(value)
@@ -110,47 +111,34 @@ int equal(Value* left, Value* right) {
 }
 
 Value* eprogn(ConsValue* cons, ConsValue* env) {
-  puts("eprogn");
-  print_value((Value*)cons);
-  puts("");
+  log_value("eprogn: ", (Value*)cons);
   if (env) {
-    print_value((Value*)env);
-    puts("");
+    log_value("  env: ", (Value*)cons);
   }
 
   // This may need to change to be more like the LISP implementation
   Value* result = NULL;
   while (cons) {
-    puts("eval");
-    print_value((Value*)cons);
-    puts("");
     result = eval(cons_car(cons), env);
-    puts("result");
-    print_value(result);
-    puts("");
     cons = (ConsValue*)cons_cdr(cons);
     // TODO: Make sure it's really a cons
   }
 
-  puts("eprogn result");
-  print_value(result);
-  puts("\n");
+  log_value("  result: ", result);
 
   return result;
 }
 
 Value* invoke(FunctionValue* func, ConsValue *args) {
-  puts("Invoke:");
-  print_value((Value*)func);
-  print_value((Value*)args);
-  puts("");
+  log_set_scope("eval:invoke");
+
+  log_value("Invoke func: ", (Value*)func);
+  log_value("Invoke args: ", (Value*)args);
 
   // For each arg, match it with params
   ConsValue* params = func->args;
 
-  puts("Expected parameters:");
-  print_value((Value*)params);
-  puts("\n");
+  log_value("Expected parameters: ", (Value*)params);
 
   // TODO: Use push_list_item
   ConsValue* env_head = NULL;
@@ -172,15 +160,13 @@ Value* invoke(FunctionValue* func, ConsValue *args) {
   // Attach the definition environment
   env->cdr = (Value*)func->env;
 
-  puts("Out of the loop");
-  print_value((Value*)env_head);
-
-  puts("\n");
+  log_value("  env:", (Value*) env_head);
 
   if (func->invoker != NULL) {
-    puts("Invoking primitive!");
+    log_format("Invoking primitive");
     return func->invoker(env_head);
   } else {
+    log_format("Invoking body");
     return eprogn(func->body, env_head);
   }
 }
@@ -189,7 +175,7 @@ ConsValue* evlis(ConsValue* exprs, ConsValue* env) {
   ConsValue* cons = NULL;
   ConsValue* head = NULL;
 
-  puts("\nEvaluating arguments");
+  log_format("Evaluating arguments");
 
   // Evaluate each item and return a new list
   while (exprs != NULL) {
@@ -203,12 +189,6 @@ ConsValue* evlis(ConsValue* exprs, ConsValue* env) {
       head = cons;
     }
 
-    /* puts("Value:"); */
-    /* print_value(exprs->car); */
-    /* puts(""); */
-    /* print_value(eval(exprs->car, env)); */
-    /* puts(""); */
-
     cons_set_car(cons, eval(exprs->car, env));
     if (last_cons != NULL) {
       last_cons->cdr = (Value*)cons;
@@ -217,9 +197,7 @@ ConsValue* evlis(ConsValue* exprs, ConsValue* env) {
     exprs = (ConsValue*)cons_cdr(exprs);
   }
 
-  /* puts("Result:"); */
-  /* print_value((Value*)head); */
-  /* puts(""); */
+  log_format("Done evaluating arguments");
 
   return (ConsValue*) head;
 }
@@ -298,19 +276,19 @@ ConsValue* init_global_env() {
   env_list.head = NULL;
   env_list.tail = NULL;
 
-  puts("Initializing env");
+  log_format("Initializing global environment");
 
   // Add primitive functions
   push_list_item(&env_list, bind_prim("+", &prim_add, make_list(2, make_symbol("x"), make_symbol("y"))));
 
-  puts("Initial env:");
-  print_value((Value*)env_list.head);
-  puts("\n");
+  log_value("Initial environment: ", (Value*)env_list.head);
 
   return env_list.head;
 }
 
 Value* eval(Value* value, ConsValue* env) {
+  log_set_scope("eval");
+
   if (is_atom(value)) {
     switch(value->type) {
     case NumberValueType:
@@ -355,10 +333,7 @@ Value* eval(Value* value, ConsValue* env) {
         return (Value*)make_function((ConsValue*)body, (ConsValue*)args, (ConsValue*)env);
       } else {
         FunctionValue* func = (FunctionValue*)eval(operator, env);
-        puts("Function operator:");
-        print_value(operator);
-        puts("");
-        /* printf("FUNC IS %d\n", (int)func); */
+        log_value("Symbol operator: ", operator);
         if (func) {
           if (func->type == FunctionValueType) {
             return invoke(func, evlis((ConsValue*)cons_cdr(expr), env));
@@ -373,11 +348,9 @@ Value* eval(Value* value, ConsValue* env) {
         }
       }
     } else {
-      puts("\nOperator:");
-      print_value(operator);
-      puts("\n");
       FunctionValue* func = (FunctionValue*)eval(operator, env);
       if (func->type == FunctionValueType) {
+        log_value("Lambda operator: ", operator);
         return invoke(func, evlis((ConsValue*)cons_cdr(expr), env));
       } else {
         puts("Cannot eval non-function in operator position!");
