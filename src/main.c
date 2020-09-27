@@ -1,10 +1,8 @@
 #include <stdio.h>
-
-#include "./types.h"
-#include "./parser.h"
+#include "./repl.h"
 
 int main() {
-  printf("Let's parse some Lisp.\n\n");
+  printf("Let's parse some Lisp.\n");
 
-  return 0;
+  return start_stdio_repl();
 }
