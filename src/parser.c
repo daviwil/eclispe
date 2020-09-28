@@ -4,6 +4,7 @@
 #include <ctype.h>
 
 #include "./types.h"
+#include "./log.h"
 #include "./list.h"
 #include "./parser.h"
 
@@ -37,11 +38,11 @@ void push_cons(ConsStack* cons_stack) {
   cons_stack->stack[cons_stack->depth - 1].head = cons;
   cons_stack->stack[cons_stack->depth - 1].tail = cons;
 
-  /* printf("Pushed cons!\n"); */
+  log_format("Pushed cons!");
 }
 
 ConsValue* pop_cons(ConsStack* cons_stack) {
-  /* printf("Popped cons at %d!\n", cons_stack->depth); */
+  log_format("Popped cons at %d!", cons_stack->depth);
 
   // TODO: Assert depth > 0
   return cons_stack->stack[--cons_stack->depth].head;
@@ -91,6 +92,8 @@ Value* finish_value(ValueType value_type, char* value_buffer, int* buffer_len) {
 }
 
 Value* parse_form(char *form_string) {
+  log_set_scope("parser");
+
   ValueType current_type = 0;
   Value* current_value = NULL;
 
@@ -229,9 +232,7 @@ Value* parse_form(char *form_string) {
     current_value = finish_value(current_type, buffer, &buffer_len);
   }
 
-  /* printf("Returning value of type: %d\n", current_value->type); */
-  /* print_value(current_value); */
-  /* puts(""); */
+  log_format("Returning value of type: %d", current_value->type);
 
   return current_value;
 }
