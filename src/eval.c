@@ -5,6 +5,7 @@
 #include "./list.h"
 #include "./eval.h"
 #include "./log.h"
+#include "./error.h"
 
 #define is_pair(value) (value->type == ConsValueType)
 #define is_atom(value) !is_pair(value)
@@ -110,7 +111,7 @@ int equal(Value* left, Value* right) {
   return 0;
 }
 
-Value* eprogn(ConsValue* cons, ConsValue* env) {
+Value* eprogn(ConsValue* cons, ConsValue* env, Error** error) {
   log_value("eprogn: ", (Value*)cons);
   if (env) {
     log_value("  env: ", (Value*)cons);
@@ -119,7 +120,11 @@ Value* eprogn(ConsValue* cons, ConsValue* env) {
   // This may need to change to be more like the LISP implementation
   Value* result = NULL;
   while (cons) {
-    result = eval(cons_car(cons), env);
+    result = eval(cons_car(cons), env, error);
+    if (*error) {
+      return NULL;
+    }
+
     cons = (ConsValue*)cons_cdr(cons);
     // TODO: Make sure it's really a cons
   }
@@ -129,7 +134,7 @@ Value* eprogn(ConsValue* cons, ConsValue* env) {
   return result;
 }
 
-Value* invoke(FunctionValue* func, ConsValue *args) {
+Value* invoke(FunctionValue* func, ConsValue *args, Error** error) {
   log_set_scope("eval:invoke");
 
   log_value("Invoke func: ", (Value*)func);
@@ -139,6 +144,8 @@ Value* invoke(FunctionValue* func, ConsValue *args) {
   ConsValue* params = func->args;
 
   log_value("Expected parameters: ", (Value*)params);
+
+  // TODO: Raise error about arity mismatch!
 
   // TODO: Use push_list_item
   ConsValue* env_head = NULL;
@@ -164,14 +171,14 @@ Value* invoke(FunctionValue* func, ConsValue *args) {
 
   if (func->invoker != NULL) {
     log_format("Invoking primitive");
-    return func->invoker(env_head);
+    return func->invoker(env_head, error);
   } else {
     log_format("Invoking body");
-    return eprogn(func->body, env_head);
+    return eprogn(func->body, env_head, error);
   }
 }
 
-ConsValue* evlis(ConsValue* exprs, ConsValue* env) {
+ConsValue* evlis(ConsValue* exprs, ConsValue* env, Error** error) {
   ConsValue* cons = NULL;
   ConsValue* head = NULL;
 
@@ -189,7 +196,11 @@ ConsValue* evlis(ConsValue* exprs, ConsValue* env) {
       head = cons;
     }
 
-    cons_set_car(cons, eval(exprs->car, env));
+    cons_set_car(cons, eval(exprs->car, env, error));
+    if (*error) {
+      return NULL;
+    }
+
     if (last_cons != NULL) {
       last_cons->cdr = (Value*)cons;
     }
@@ -202,7 +213,7 @@ ConsValue* evlis(ConsValue* exprs, ConsValue* env) {
   return (ConsValue*) head;
 }
 
-Value* lookup(SymbolValue *symbol, ConsValue* env) {
+Value* lookup(SymbolValue *symbol, ConsValue* env, Error** error) {
   ConsValue* cons = (ConsValue*) env;
   while (cons != NULL) {
     if (cons->type != ConsValueType) {
@@ -217,14 +228,18 @@ Value* lookup(SymbolValue *symbol, ConsValue* env) {
     cons = (ConsValue*)cons->cdr;
   }
 
+  char msg[100];
+  sprintf(msg, "Couldn't find symbol in scope: %s", symbol->symbol_name);
+  *error = make_error(msg);
+
   return NULL;
 }
 
-Value *lookup_by_name(char *name, ConsValue *env) {
+Value *lookup_by_name(char *name, ConsValue *env, Error** error) {
   SymbolValue symbol;
   symbol.type = SymbolValueType;
   symbol.symbol_name = name;
-  return lookup(&symbol, env);
+  return lookup(&symbol, env, error);
 }
 
 Value* update(Value* symbol, Value* new_value, ConsValue* env) {
@@ -246,9 +261,9 @@ Value* update(Value* symbol, Value* new_value, ConsValue* env) {
   return NULL;
 }
 
-Value* prim_add(ConsValue* env) {
-  Value* x = lookup_by_name("x", env);
-  Value* y = lookup_by_name("y", env);
+Value* prim_add(ConsValue* env, Error** error) {
+  Value* x = lookup_by_name("x", env, error);
+  Value* y = lookup_by_name("y", env, error);
 
   if (x && x->type == NumberValueType) {
     if (y) {
@@ -286,7 +301,7 @@ ConsValue* init_global_env() {
   return env_list.head;
 }
 
-Value* eval(Value* value, ConsValue* env) {
+Value* eval(Value* value, ConsValue* env, Error** error) {
   log_set_scope("eval");
 
   if (is_atom(value)) {
@@ -295,7 +310,7 @@ Value* eval(Value* value, ConsValue* env) {
     case StringValueType:
       return value;
     case SymbolValueType:
-      return lookup((SymbolValue*)value, env);
+      return lookup((SymbolValue*)value, env, error);
     }
   } else {
     ConsValue* expr = (ConsValue*)value;
@@ -304,65 +319,88 @@ Value* eval(Value* value, ConsValue* env) {
       // Check for special forms
       if (is_symbol_named(operator, "if")) {
         // TODO: Check argument length
-        Value* if_result = eval(cons_cadr(expr), env);
+        Value* if_result = eval(cons_cadr(expr), env, error);
+        if (*error) {
+          return NULL;
+        }
 
         // TODO: Check for nil and false
         if (if_result) {
-          return eval(cons_caddr(expr), env);
+          return eval(cons_caddr(expr), env, error);
         } else {
-          return eval(cons_cadddr(expr), env);
+          return eval(cons_cadddr(expr), env, error);
         }
       } else if (is_symbol_named(operator, "set!")) {
-        return update(cons_cadr(expr), eval(cons_caddr(expr), env), env);
+        return update(cons_cadr(expr), eval(cons_caddr(expr), env, error), env);
       } else if (is_symbol_named(operator, "quote")) {
         return cons_cadr(expr);
       } else if (is_symbol_named(operator, "begin")) {
         // TODO: Verify cons
-        return eprogn((ConsValue*)cons_cdr(expr), env);
+        return eprogn((ConsValue*)cons_cdr(expr), env, error);
       } else if (is_symbol_named(operator, "lambda")) {
         Value* args = cons_cadr(expr);
         Value* body = cons_cddr(expr);
         if (args->type != ConsValueType) {
-          puts("Lambda must have a list in argument position");
+          *error = make_error("Lambda must have a list in argument position");
           return NULL;
         }
         if (body == NULL) {
-          puts("Lambda must have a body");
+          *error = make_error("Lambda must have a body");
           return NULL;
         }
         return (Value*)make_function((ConsValue*)body, (ConsValue*)args, (ConsValue*)env);
       } else {
-        FunctionValue* func = (FunctionValue*)eval(operator, env);
+        FunctionValue* func = (FunctionValue*)eval(operator, env, error);
+        if (*error) {
+          return NULL;
+        }
+
         log_value("Symbol operator: ", operator);
         if (func) {
           if (func->type == FunctionValueType) {
-            return invoke(func, evlis((ConsValue*)cons_cdr(expr), env));
+            ConsValue* args = evlis((ConsValue*)cons_cdr(expr), env, error);
+            if (*error) {
+              return NULL;
+            }
+
+            return invoke(func, args, error);
           } else {
-            puts("Cannot eval non-function in operator position!");
+            *error = make_error("Cannot eval non-function in operator position!");
             return NULL;
           }
         } else {
-          printf("Could not resolve operator: ");
-          print_value(operator);
-          puts("");
+          // TODO: Include operator name
+          *error = make_error("Can't resolve operator");
+          log_value("Can't resolve operator: ", operator);
+          return NULL;
         }
       }
     } else {
-      FunctionValue* func = (FunctionValue*)eval(operator, env);
-      if (func->type == FunctionValueType) {
-        log_value("Lambda operator: ", operator);
-        return invoke(func, evlis((ConsValue*)cons_cdr(expr), env));
-      } else {
-        puts("Cannot eval non-function in operator position!");
+      FunctionValue* func = (FunctionValue*)eval(operator, env, error);
+      if (*error) {
         return NULL;
       }
 
-      printf("Operator is not a symbol!\n");
+      if (func->type == FunctionValueType) {
+        log_value("Lambda operator: ", operator);
+        ConsValue* args = evlis((ConsValue*)cons_cdr(expr), env, error);
+        if (*error) {
+          return NULL;
+        }
+
+        return invoke(func, args, error);
+      } else {
+        *error = make_error("Cannot eval non-function in operator position!");
+        return NULL;
+      }
+
+      *error = make_error("Cannot eval non-function in operator position!");
+      log_value("Operator is not a symbol or lambda: ", operator);
     }
   }
 
-  printf("Exiting eval without a result.\n");
+  *error = make_error("Cannot eval expression");
+  log_value("Could not evaluate expression: ", value);
 
-  // TODO: What's the ideal return value here?
   return NULL;
 }

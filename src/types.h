@@ -1,6 +1,8 @@
 #ifndef _TYPES_H
 #define _TYPES_H
 
+#include "./error.h"
+
 typedef unsigned char ValueType;
 
 typedef struct {
@@ -41,7 +43,7 @@ typedef struct {
 // Defines the signature for primitive function pointers.
 // Accepts an environment as parameter, all arguments will
 // be bound within it.
-typedef Value* (*PrimFunc)(ConsValue*);
+typedef Value* (*PrimFunc)(ConsValue*, Error**);
 
 typedef struct {
   ValueType type;

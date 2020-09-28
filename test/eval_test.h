@@ -4,61 +4,79 @@
 #include "../src/eval.h"
 #include "./checks.h"
 
-#define check_eval(value, result_var, expected_type)  \
-  result_var = eval(parse_form, NULL);                \
-  ASSERT_EQ(expected_type, result_var->type);
-
 TEST evaluates_numbers(void) {
-  Value *result = parse_form("42");
-  Value *num = eval(result, NULL);
+  Error* error = NULL;
+  Value *result = parse_form("42", &error);
+  ASSERT_EQ(NULL, error);
+
+  Value *num = eval(result, NULL, &error);
+  ASSERT_EQ(NULL, error);
+
   check_number(num, 42);
 
   PASS();
 }
 
 TEST evaluates_strings(void) {
-  Value *result = parse_form("\"hello world!\"");
-  Value *str = eval(result, NULL);
+  Error* error = NULL;
+  Value *result = parse_form("\"hello world!\"", &error);
+  Value *str = eval(result, NULL, &error);
+  ASSERT_EQ(NULL, error);
+
   check_string(str, "hello world!");
 
   PASS();
 }
 
 TEST evaluates_if(void) {
-  Value *result = parse_form("(if 1 2 3)");
-  Value *num = eval(result, NULL);
+  Error* error = NULL;
+  Value *result = parse_form("(if 1 2 3)", &error);
+  Value *num = eval(result, NULL, &error);
+  ASSERT_EQ(NULL, error);
+
   check_number(num, 2);
 
   PASS();
 }
 
 TEST evaluates_quote(void) {
-  Value *result = parse_form("(quote hamburger)");
-  Value *symbol = eval(result, NULL);
+  Error* error = NULL;
+  Value *result = parse_form("(quote hamburger)", &error);
+  Value *symbol = eval(result, NULL, &error);
+  ASSERT_EQ(NULL, error);
+
   check_symbol(symbol, "hamburger");
 
   PASS();
 }
 
 TEST evaluates_begin(void) {
-  Value *result = parse_form("(begin 1 2 3)");
-  Value *num = eval(result, NULL);
+  Error* error = NULL;
+  Value *result = parse_form("(begin 1 2 3)", &error);
+  Value *num = eval(result, NULL, &error);
+  ASSERT_EQ(NULL, error);
+
   check_number(num, 3);
 
   PASS();
 }
 
 TEST evaluates_symbol(void) {
+  Error* error = NULL;
   ConsValue *env = make_list(2, make_cons_with((Value*)make_symbol("bogus"), (Value*)make_number(2)),
                                 make_cons_with((Value*)make_symbol("test"),  (Value*)make_number(4)));
 
-  Value *result = parse_form("test");
-  Value *num = eval(result, env);
+  Value *result = parse_form("test", &error);
+  Value *num = eval(result, env, &error);
+  ASSERT_EQ(NULL, error);
+
   check_number(num, 4);
 
-  result = parse_form("bork");
-  Value *nope = eval(result, env);
+  result = parse_form("bork", &error);
+  Value *nope = eval(result, env, &error);
   ASSERT_EQ(NULL, nope);
+  ASSERT(error);
+  ASSERT_STR_EQ("Couldn't find symbol in scope: bork", error->message);
 
   PASS();
 }
@@ -66,16 +84,23 @@ TEST evaluates_symbol(void) {
 TEST evaluates_set(void) {
   ConsValue *env = make_list(1, make_cons_with((Value*)make_symbol("test"),  (Value*)make_number(4)));
 
-  Value* result = parse_form("(set! test 311)");
-  Value* num = eval(result, env);
+  Error* error = NULL;
+  Value* result = parse_form("(set! test 311)", &error);
+  Value* num = eval(result, env, &error);
+  ASSERT_EQ(NULL, error);
+
   check_number(num, 311);
 
-  result = parse_form("test");
-  Value* new_num = eval(result, env);
+  result = parse_form("test", &error);
+  Value* new_num = eval(result, env, &error);
+  ASSERT_EQ(NULL, error);
+
   check_number(num, 311);
 
-  result = parse_form("(set! bogus \"oh no\")");
-  Value* nope = eval(result, env);
+  result = parse_form("(set! bogus \"oh no\")", &error);
+  Value* nope = eval(result, env, &error);
+  ASSERT_EQ(NULL, error);
+
   ASSERT_EQ(NULL, nope);
 
   PASS();
@@ -84,12 +109,17 @@ TEST evaluates_set(void) {
 TEST evaluates_lambda(void) {
   ConsValue *env = init_global_env();
 
-  Value* result = parse_form("((lambda (x) x) 2)");
-  Value* num = eval(result, env);
+  Error* error = NULL;
+  Value* result = parse_form("((lambda (x) x) 2)", &error);
+  Value* num = eval(result, env, &error);
+  ASSERT_EQ(NULL, error);
+
   check_number(num, 2);
 
-  result = parse_form("((lambda (x) ((lambda (y) (+ x y)) 3)) 2)");
-  num = eval(result, env);
+  result = parse_form("((lambda (x) ((lambda (y) (+ x y)) 3)) 2)", &error);
+  num = eval(result, env, &error);
+  ASSERT_EQ(NULL, error);
+
   check_number(num, 5);
 
   PASS();

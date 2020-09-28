@@ -5,6 +5,7 @@
 
 #include "./types.h"
 #include "./log.h"
+#include "./error.h"
 #include "./list.h"
 #include "./parser.h"
 
@@ -91,11 +92,24 @@ Value* finish_value(ValueType value_type, char* value_buffer, int* buffer_len) {
   return value;
 }
 
-Value* parse_form(char *form_string) {
+void move_cursor(int delta, unsigned int* i, unsigned int* line, unsigned int* col) {
+  *i = *i + delta;
+
+  // TODO: How do I know how long each line is?
+
+  if (delta < 0) {
+  } else {
+  }
+}
+
+Value* parse_form(char *form_string, Error** error) {
   log_set_scope("parser");
 
   ValueType current_type = 0;
   Value* current_value = NULL;
+
+  unsigned int source_line = 1;
+  unsigned int source_col = 0;
 
   unsigned char is_pair = 0;
   ConsStack cons_stack;
@@ -104,12 +118,13 @@ Value* parse_form(char *form_string) {
   // Used for string parsing
   unsigned char is_char_escaped = 0;
 
-  char buffer[100];
+  char buffer[1000];
   int buffer_len = -1;
 
-  int i = 0;
-  int len = strlen(form_string);
-  for (; i < len; i++) {
+  unsigned int i = 0;
+  unsigned int len = strlen(form_string);
+
+  while (i < len) {
     char c = form_string[i];
 
     /* printf("Type: %d | Character %d: %c\n", current_type, i, c); */
@@ -134,16 +149,17 @@ Value* parse_form(char *form_string) {
             current_value = (Value*)popped_cons;
           }
         } else {
-          // TODO: Parse error
-          printf("ERROR: Unmatched close parentheses\n");
+          // TODO: Add source location
+          *error = make_error("Unmatched close parentheses");
+          return NULL;
         }
       } else if (c == '.' && current_type == ConsValueType) {
         if (is_pair == 0) {
           is_pair = 1;
         } else {
-          // TODO: Error
-          printf("Can't have more than one '.' in a pair!\n");
-          break;
+          // TODO: Add source location
+          *error = make_error("Can't have more than one '.' in a pair");
+          return NULL;
         }
       } else if (c == '"') {
         // TODO: One day I'll have to deal with Unicode
@@ -170,7 +186,7 @@ Value* parse_form(char *form_string) {
 
           if (c == ')') {
             // Let the outer case handle it
-            i--;
+            move_cursor(-1, &i, &source_line, &source_col);
           }
         }
       } else if (c == '\\') {
@@ -191,7 +207,7 @@ Value* parse_form(char *form_string) {
 
           if (c == ')') {
             // Let the outer case handle it
-            i--;
+            move_cursor(-1, &i, &source_line, &source_col);
           }
         } else {
           // TODO: Maybe don't stop yet so we can error if there's another form
@@ -210,26 +226,24 @@ Value* parse_form(char *form_string) {
 
           if (c == ')') {
             // Let the outer case handle it
-            i--;
+            move_cursor(-1, &i, &source_line, &source_col);
           }
         }
       }
     }
+
+    move_cursor(1, &i, &source_line, &source_col);
   }
 
-  if (i == len && current_value == NULL) {
-
-    /* printf("End of string, type: %d, cons: %d\n", current_type, current_cons); */
-
-    // TODO: How to check for incomplete forms in new model?
-    /* if (cons_stack.depth == 0) { */
-    /*   // TODO: Error on incomplete forms */
-    /*   // TODO: Is this case even possible?  depth would be 1 at least */
-    /* } else { */
-    /*   current_value = finish_value(current_type, buffer, &buffer_len); */
-    /* } */
-
-    current_value = finish_value(current_type, buffer, &buffer_len);
+  if (i == len) {
+    if (cons_stack.depth > 0) {
+      log_format("End of string with unmatched parens, depth: %d", cons_stack.depth);
+      *error = make_error("Unmatched open parentheses");
+      return NULL;
+    } else if (current_value == NULL) {
+      log_format("End of string, finishing type: %d", current_type);
+      current_value = finish_value(current_type, buffer, &buffer_len);
+    }
   }
 
   log_format("Returning value of type: %d", current_value->type);

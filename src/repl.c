@@ -2,11 +2,13 @@
 
 #include "./types.h"
 #include "./parser.h"
+#include "./error.h"
 #include "./eval.h"
 #include "./repl.h"
 
 int start_stdio_repl() {
   Value* result = NULL;
+  Error* error = NULL;
   char input[10000];
 
   ConsValue *env = init_global_env();
@@ -22,9 +24,27 @@ int start_stdio_repl() {
         break;
       }
     } else {
-      Value* form = parse_form(input);
-      result = eval(form, env);
-      print_value(result);
+      Value* form = parse_form(input, &error);
+
+      if (error) {
+        printf("Error: %s", error->message);
+        free_error(error);
+        error = NULL;
+      } else {
+        result = eval(form, env, &error);
+
+        if (error) {
+          printf("Error: %s", error->message);
+          free_error(error);
+          error = NULL;
+        } else {
+          if (result == NULL) {
+            printf("Error: No result, unknown error occurred!");
+          } else {
+            print_value(result);
+          }
+        }
+      }
     }
 
     puts("");

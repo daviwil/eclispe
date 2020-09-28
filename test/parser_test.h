@@ -3,7 +3,8 @@
 #include "./checks.h"
 
 TEST form_is_number(char* input, int expected) {
-  Value* result = parse_form(input);
+  Error* error = NULL;
+  Value* result = parse_form(input, &error);
   ASSERT_EQ(NumberValueType, result->type);
   ASSERT_EQ(expected, ((NumberValue*)result)->number_value);
 
@@ -11,31 +12,35 @@ TEST form_is_number(char* input, int expected) {
 }
 
 TEST parser_parses_numbers(void) {
-  Value* result = parse_form("42");
+  Error* error = NULL;
+  Value* result = parse_form("42", &error);
   check_number(result, 42);
 
   PASS();
 }
 
 TEST parser_parses_symbols(void) {
-  Value* result = parse_form("symbol");
+  Error* error = NULL;
+  Value* result = parse_form("symbol", &error);
   check_symbol(result, "symbol");
 
   PASS();
 }
 
 TEST parser_parses_strings(void) {
-  Value* result = parse_form("\"hello world!\"");
+  Error* error = NULL;
+  Value* result = parse_form("\"hello world!\"", &error);
   check_string(result, "hello world!");
 
-  Value* result2 = parse_form("\"hello \\\"world!\\\"\"");
+  Value* result2 = parse_form("\"hello \\\"world!\\\"\"", &error);
   check_string(result2, "hello \"world!\"");
 
   PASS();
 }
 
 TEST parser_parses_pairs(void) {
-  Value* result = parse_form("(test . 1)");
+  Error* error = NULL;
+  Value* result = parse_form("(test . 1)", &error);
   ASSERT_EQ(ConsValueType, result->type);
 
   ConsValue* cons = (ConsValue *)result;
@@ -49,7 +54,8 @@ TEST parser_parses_pairs(void) {
 }
 
 TEST parser_parses_lists(void) {
-  Value* cons = parse_form("(test 1 2)");
+  Error* error = NULL;
+  Value* cons = parse_form("(test 1 2)", &error);
 
   ASSERT_EQ(ConsValueType, cons->type);
 
@@ -71,7 +77,8 @@ TEST parser_parses_lists(void) {
 }
 
 TEST parser_parses_nested_lists(void) {
-  ConsValue* result = (ConsValue *)parse_form("((lambda (x) (+ 1 x)) 2)");
+  Error* error = NULL;
+  ConsValue* result = (ConsValue *)parse_form("((lambda (x) (+ 1 x)) 2)", &error);
   ASSERT_EQ(ConsValueType, result->type);
 
   Value* lambda_expr = NULL;
@@ -111,11 +118,30 @@ TEST parser_parses_nested_lists(void) {
 }
 
 TEST parser_ends_at_boundaries(void) {
-  Value *result = parse_form("42   ");
+  Error* error = NULL;
+  Value *result = parse_form("42   ", &error);
   check_number(result, 42);
 
-  Value *result2 = parse_form("42\n");
+  Value *result2 = parse_form("42\n", &error);
   check_number(result2, 42);
+
+  PASS();
+}
+
+TEST parser_errors_unmatched_paren(void) {
+  Error* error = NULL;
+  ConsValue* result = (ConsValue *)parse_form("((+ 1 x)", &error);
+  ASSERT_EQ(result, NULL);
+
+  ASSERT(error);
+  ASSERT_STR_EQ("Unmatched open parentheses", error->message);
+
+  error = NULL;
+  result = (ConsValue *)parse_form("(+ 1 x))", &error);
+  ASSERT_EQ(result, NULL);
+
+  ASSERT(error);
+  ASSERT_STR_EQ("Unmatched close parentheses", error->message);
 
   PASS();
 }
@@ -127,6 +153,7 @@ SUITE(parser_suite) {
     RUN_TEST(parser_parses_pairs);
     RUN_TEST(parser_parses_lists);
     RUN_TEST(parser_parses_nested_lists);
-
     RUN_TEST(parser_ends_at_boundaries);
+
+    RUN_TEST(parser_errors_unmatched_paren);
 }
