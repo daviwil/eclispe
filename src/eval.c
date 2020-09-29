@@ -282,6 +282,71 @@ Value* prim_add(ConsValue* env, Error** error) {
   return NULL;
 }
 
+Value* prim_sub(ConsValue* env, Error** error) {
+  Value* x = lookup_by_name("x", env, error);
+  Value* y = lookup_by_name("y", env, error);
+
+  if (x && x->type == NumberValueType) {
+    if (y) {
+      if (y->type == NumberValueType) {
+        return (Value*)make_number(((NumberValue*)x)->number_value - ((NumberValue*)y)->number_value);
+      } else {
+        puts("Argument 'y' is not a number!");
+      }
+    } else {
+      return x;
+    }
+  } else {
+    puts("Argument 'x' is not a number!");
+  }
+
+  return NULL;
+}
+
+Value* prim_mul(ConsValue* env, Error** error) {
+  Value* x = lookup_by_name("x", env, error);
+  Value* y = lookup_by_name("y", env, error);
+
+  if (x && x->type == NumberValueType) {
+    if (y) {
+      if (y->type == NumberValueType) {
+        return (Value*)make_number(((NumberValue*)x)->number_value * ((NumberValue*)y)->number_value);
+      } else {
+        puts("Argument 'y' is not a number!");
+      }
+    } else {
+      return x;
+    }
+  } else {
+    puts("Argument 'x' is not a number!");
+  }
+
+  return NULL;
+}
+
+Value* prim_div(ConsValue* env, Error** error) {
+  Value* x = lookup_by_name("x", env, error);
+  Value* y = lookup_by_name("y", env, error);
+
+  // TODO: Protect against divide by zero
+
+  if (x && x->type == NumberValueType) {
+    if (y) {
+      if (y->type == NumberValueType) {
+        return (Value*)make_number(((NumberValue*)x)->number_value / ((NumberValue*)y)->number_value);
+      } else {
+        puts("Argument 'y' is not a number!");
+      }
+    } else {
+      return x;
+    }
+  } else {
+    puts("Argument 'x' is not a number!");
+  }
+
+  return NULL;
+}
+
 Value* bind_prim(char* name, PrimFunc invoker, ConsValue* args) {
   return (Value*)make_cons_with((Value*)make_symbol(name), (Value*)make_prim_function(invoker, args, NULL));
 }
@@ -295,6 +360,9 @@ ConsValue* init_global_env() {
 
   // Add primitive functions
   push_list_item(&env_list, bind_prim("+", &prim_add, make_list(2, make_symbol("x"), make_symbol("y"))));
+  push_list_item(&env_list, bind_prim("-", &prim_sub, make_list(2, make_symbol("x"), make_symbol("y"))));
+  push_list_item(&env_list, bind_prim("*", &prim_mul, make_list(2, make_symbol("x"), make_symbol("y"))));
+  push_list_item(&env_list, bind_prim("/", &prim_div, make_list(2, make_symbol("x"), make_symbol("y"))));
 
   log_value("Initial environment: ", (Value*)env_list.head);
 
