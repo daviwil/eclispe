@@ -39,11 +39,11 @@ void push_cons(ConsStack* cons_stack) {
   cons_stack->stack[cons_stack->depth - 1].head = cons;
   cons_stack->stack[cons_stack->depth - 1].tail = cons;
 
-  log_format("Pushed cons!");
+  log("Pushed cons!");
 }
 
 ConsValue* pop_cons(ConsStack* cons_stack) {
-  log_format("Popped cons at %d!", cons_stack->depth);
+  log("Popped cons at %d!", cons_stack->depth);
 
   // TODO: Assert depth > 0
   return cons_stack->stack[--cons_stack->depth].head;
@@ -237,16 +237,16 @@ Value* parse_form(char *form_string, Error** error) {
 
   if (i == len) {
     if (cons_stack.depth > 0) {
-      log_format("End of string with unmatched parens, depth: %d", cons_stack.depth);
+      log("End of string with unmatched parens, depth: %d", cons_stack.depth);
       *error = make_error("Unmatched open parentheses");
       return NULL;
     } else if (current_value == NULL) {
-      log_format("End of string, finishing type: %d", current_type);
+      log("End of string, finishing type: %d", current_type);
       current_value = finish_value(current_type, buffer, &buffer_len);
     }
   }
 
-  log_format("Returning value of type: %d", current_value->type);
+  log("Returning value of type: %d", current_value->type);
 
   return current_value;
 }

@@ -170,10 +170,10 @@ Value* invoke(FunctionValue* func, ConsValue *args, Error** error) {
   log_value("  env:", (Value*) env_head);
 
   if (func->invoker != NULL) {
-    log_format("Invoking primitive");
+    log("Invoking primitive");
     return func->invoker(env_head, error);
   } else {
-    log_format("Invoking body");
+    log("Invoking body");
     return eprogn(func->body, env_head, error);
   }
 }
@@ -182,7 +182,7 @@ ConsValue* evlis(ConsValue* exprs, ConsValue* env, Error** error) {
   ConsValue* cons = NULL;
   ConsValue* head = NULL;
 
-  log_format("Evaluating arguments");
+  log("Evaluating arguments");
 
   // Evaluate each item and return a new list
   while (exprs != NULL) {
@@ -208,7 +208,7 @@ ConsValue* evlis(ConsValue* exprs, ConsValue* env, Error** error) {
     exprs = (ConsValue*)cons_cdr(exprs);
   }
 
-  log_format("Done evaluating arguments");
+  log("Done evaluating arguments");
 
   return (ConsValue*) head;
 }
@@ -291,7 +291,7 @@ ConsValue* init_global_env() {
   env_list.head = NULL;
   env_list.tail = NULL;
 
-  log_format("Initializing global environment");
+  log("Initializing global environment");
 
   // Add primitive functions
   push_list_item(&env_list, bind_prim("+", &prim_add, make_list(2, make_symbol("x"), make_symbol("y"))));
