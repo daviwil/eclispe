@@ -1,3 +1,4 @@
+#include "../src/mem.h"
 #include "./greatest.h"
 #include "./parser_test.h"
 #include "./eval_test.h"
@@ -6,10 +7,14 @@
 GREATEST_MAIN_DEFS();
 
 int main(int argc, char **argv) {
-    GREATEST_MAIN_BEGIN();
+  GREATEST_MAIN_BEGIN();
 
-    RUN_SUITE(parser_suite);
-    RUN_SUITE(eval_suite);
+  RUN_SUITE(parser_suite);
+  RUN_SUITE(eval_suite);
 
-    GREATEST_MAIN_END();
+  puts("");
+
+  mem_print_status();
+
+  GREATEST_MAIN_END();
 }

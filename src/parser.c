@@ -54,6 +54,16 @@ ConsValue* push_stack_list_item(ConsStack* cons_stack, Value *value) {
   return push_list_item(&cons_stack->stack[cons_stack->depth - 1], value);
 }
 
+void free_cons_stack(ConsStack* cons_stack) {
+  for (int i = 0; i < cons_stack->depth; i++) {
+    if (cons_stack->stack[i].head) {
+      free_value((Value*)cons_stack->stack[i].head);
+      cons_stack->stack[i].head = NULL;
+      cons_stack->stack[i].tail = NULL;
+    }
+  }
+}
+
 void set_current_cons_value(ConsStack* cons_stack, Value* value, unsigned char *is_pair) {
   // TODO: Assert depth > 0
   ConsValue* current_cons = cons_stack->stack[cons_stack->depth - 1].tail;
@@ -102,6 +112,13 @@ void move_cursor(int delta, unsigned int* i, unsigned int* line, unsigned int* c
   }
 }
 
+#define ERROR(message)          \
+  if (current_value) {          \
+    free_value(current_value);  \
+  }                             \
+  free_cons_stack(&cons_stack); \
+  *error = make_error(message); // TODO: Add source location
+
 Value* parse_form(char *form_string, Error** error) {
   log_set_scope("parser");
 
@@ -149,16 +166,14 @@ Value* parse_form(char *form_string, Error** error) {
             current_value = (Value*)popped_cons;
           }
         } else {
-          // TODO: Add source location
-          *error = make_error("Unmatched close parentheses");
+          ERROR("Unmatched close parentheses");
           return NULL;
         }
       } else if (c == '.' && current_type == ConsValueType) {
         if (is_pair == 0) {
           is_pair = 1;
         } else {
-          // TODO: Add source location
-          *error = make_error("Can't have more than one '.' in a pair");
+          ERROR("Can't have more than one '.' in a pair");
           return NULL;
         }
       } else if (c == '"') {
@@ -178,16 +193,18 @@ Value* parse_form(char *form_string, Error** error) {
       }
     } else if (current_type == StringValueType) {
       if (c == '"' && is_char_escaped == 0) {
-        current_value = finish_value(current_type, buffer, &buffer_len);
+        Value* value = finish_value(current_type, buffer, &buffer_len);
 
         if (cons_stack.depth > 0) {
-          set_current_cons_value(&cons_stack, current_value, &is_pair);
+          set_current_cons_value(&cons_stack, value, &is_pair);
           current_type = ConsValueType;
 
           if (c == ')') {
             // Let the outer case handle it
             move_cursor(-1, &i, &source_line, &source_col);
           }
+        } else {
+          current_value = value;
         }
       } else if (c == '\\') {
         is_char_escaped = 1;
@@ -199,10 +216,10 @@ Value* parse_form(char *form_string, Error** error) {
       if (isdigit(c)) {
         push_char(buffer, &buffer_len, c);
       } else if (is_boundary(c)) {
-        current_value = finish_value(current_type, buffer, &buffer_len);
+        Value* value = finish_value(current_type, buffer, &buffer_len);
 
         if (cons_stack.depth > 0) {
-          set_current_cons_value(&cons_stack, current_value, &is_pair);
+          set_current_cons_value(&cons_stack, value, &is_pair);
           current_type = ConsValueType;
 
           if (c == ')') {
@@ -211,6 +228,7 @@ Value* parse_form(char *form_string, Error** error) {
           }
         } else {
           // TODO: Maybe don't stop yet so we can error if there's another form
+          current_value = value;
           break;
         }
       }
@@ -218,16 +236,18 @@ Value* parse_form(char *form_string, Error** error) {
       if (is_symbol_char(c)) {
         push_char(buffer, &buffer_len, c);
       } else if (is_boundary(c)) {
-        current_value = finish_value(current_type, buffer, &buffer_len);
+        Value* value = finish_value(current_type, buffer, &buffer_len);
 
         if (cons_stack.depth > 0) {
-          set_current_cons_value(&cons_stack, current_value, &is_pair);
+          set_current_cons_value(&cons_stack, value, &is_pair);
           current_type = ConsValueType;
 
           if (c == ')') {
             // Let the outer case handle it
             move_cursor(-1, &i, &source_line, &source_col);
           }
+        } else {
+          current_value = value;
         }
       }
     }
@@ -238,7 +258,7 @@ Value* parse_form(char *form_string, Error** error) {
   if (i == len) {
     if (cons_stack.depth > 0) {
       log("End of string with unmatched parens, depth: %d", cons_stack.depth);
-      *error = make_error("Unmatched open parentheses");
+      ERROR("Unmatched open parentheses");
       return NULL;
     } else if (current_value == NULL) {
       log("End of string, finishing type: %d", current_type);

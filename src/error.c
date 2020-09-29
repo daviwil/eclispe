@@ -1,3 +1,4 @@
+#include "./mem.h"
 #include "./error.h"
 
 #include <stdio.h>
@@ -5,10 +6,10 @@
 #include <string.h>
 
 Error* make_error(const char* message) {
-  Error* error = (Error*)malloc(sizeof(Error));
+  Error* error = (Error*)mem_alloc(sizeof(Error));
 
   unsigned long str_size = strlen(message) + 1;
-  char* message_copy = (char *)malloc(str_size);
+  char* message_copy = (char *)mem_alloc(str_size);
   memcpy(message_copy, message, str_size);
 
   error->message = message_copy;
@@ -22,6 +23,7 @@ void free_error(Error* error) {
       // TODO: Free location
     }
 
-    free(error);
+    mem_free(error->message);
+    mem_free(error);
   }
 }

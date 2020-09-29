@@ -25,4 +25,10 @@
   ASSERT_EQ(expected_type, ((ConsValue*)cons_var)->cdr->type); \
   cdr_var = ((ConsValue*)cons_var)->cdr;
 
+#define check_mem_start() long _mem_allocated = mem_amount_allocated();
+
+#define check_mem_end()                                             \
+  long _mem_leaked = mem_amount_allocated() - _mem_allocated;       \
+  ASSERT_EQ_FMT(0, _mem_leaked, "Remaining allocation: %ld bytes");
+
 #endif

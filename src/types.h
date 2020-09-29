@@ -16,7 +16,7 @@ typedef struct {
 
 typedef struct {
   ValueType type;
-  short number_value;
+  int number_value;
 } NumberValue;
 
 typedef struct {
@@ -72,6 +72,7 @@ ConsValue* make_cons_with(Value* car, Value* cdr);
 FunctionValue* make_function(ConsValue* body, ConsValue* args, ConsValue* env);
 FunctionValue* make_prim_function(PrimFunc invoker, ConsValue* args, ConsValue* env);
 
+void free_value(Value *value);
 void print_value(Value *value);
 
 #endif
