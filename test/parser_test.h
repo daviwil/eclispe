@@ -33,10 +33,38 @@ TEST parser_parses_symbols(void) {
   check_mem_start();
 
   Error* error = NULL;
-  Value* result = parse_form("symbol", &error);
-  check_symbol(result, "symbol");
+  Value* result = NULL;
 
+  result = parse_form("symbol", &error);
+  ASSERT_EQ(NULL, error);
+  check_symbol(result, "symbol");
   free_value(result);
+
+  result = parse_form("list->string", &error);
+  ASSERT_EQ(NULL, error);
+  check_symbol(result, "list->string");
+  free_value(result);
+
+  result = parse_form("keyword:", &error);
+  ASSERT_EQ(NULL, error);
+  check_symbol(result, "keyword:");
+  free_value(result);
+
+  result = parse_form("predicate?", &error);
+  ASSERT_EQ(NULL, error);
+  check_symbol(result, "predicate?");
+  free_value(result);
+
+  result = parse_form("$1", &error);
+  ASSERT_EQ(NULL, error);
+  check_symbol(result, "$1");
+  free_value(result);
+
+  result = parse_form("namespace/symbol", &error);
+  ASSERT_EQ(NULL, error);
+  check_symbol(result, "namespace/symbol");
+  free_value(result);
+
   check_mem_end();
 
   PASS();

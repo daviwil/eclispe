@@ -11,7 +11,7 @@
 
 #define is_whitespace(c) (c == ' ' || c == '\n' || c == '\t')
 #define is_boundary(c) (is_whitespace(c) || c == ')')
-#define is_symbol_char(c) (isalpha(c) || c == '+' || c == '-' || c == '/' || c == '*' || c == '!'|| c == '?')
+#define is_symbol_char(c) (isalpha(c) || isdigit(c) || c == '!' ||  c == '$' || c == '%' || c == '&' || c == '*' || c == '+' || c == '-' || c == '.' || c == '/' || c == ':' || c == '<' ||  c == '=' || c == '>' || c == '?' || c == '@' || c == '_' || c == '^')
 
 // Arbitrarily picking the maximum depth of list forms, this will probably need
 // to be increased.
